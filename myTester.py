@@ -12,8 +12,48 @@ from util import *
 import pandas as pd
 import numpy as np
 
+class TranslateProblem(SearchProblem):
+	def __init__(self, comment, weights):
+		# Comment is a full comment, turned into a list of words
+		self.comment = comment.split()
+		# Weights is a dictionary where keys are words and vals are their weight, as predicted by our linear classifier
+		self.weights = weights
 
-if __name__ == '__main__': 
+	def startState(self):
+		# Return information for start state
+		return ([], 0)
+
+	def isEnd(self, state):
+		return (len(self.comment)) == state[1]
+
+	def succAndCost(self, state):
+		currentCom, index = state
+		successors = []
+
+		# Create list of Actions
+		#actions = synonyms
+		actions = []
+		actions.append("ACTION_KEEP")
+		actions.append("ACTION_DELETE")
+
+		# For each action, find successor state and cost
+		for a in actions:
+			newCom = currentCom[:]
+			if a == "ACTION_KEEP":
+				newCom.append(self.comment[index])
+				newState = (newCom, index + 1)
+				successors.append((a, newState, self.weights[self.comment[index]]))
+			#elif a == "ACTION_DELETE":
+				#newState = (newCom, index + 1)
+				#successors.append((a, newState, 0)
+			else:
+				newCom.append(a)
+				newState = (newCom, index + 1)
+				successors.append((a, newState, self.weights[a]))
+		return successors
+
+
+if __name__ == '__main__':
 	#### UNCOMMENT THIS SECTION after you run this for the first time
 
 	#Create the test and train .dev files
@@ -41,7 +81,7 @@ if __name__ == '__main__':
 		else:
 			f.write("-1 %s\r\n" % comment)
 	f.close()
-	
+
 	#####
 
 	negativeThreshold = -.5
@@ -55,7 +95,7 @@ if __name__ == '__main__':
 	trainError = evaluatePredictor(trainExamples, lambda(x) : (1 if dotProduct(featureExtractor(x), weights) >= 0 else -1))
 	devError = evaluatePredictor(devExamples, lambda(x) : (1 if dotProduct(featureExtractor(x), weights) >= 0 else -1))
 	print "Official: train error = %s, dev error = %s" % (trainError, devError)
-    
+
 	toxicExamples = readExamples('toxic.dev')
 	for example in toxicExamples:
 		comment, rating = example
@@ -68,4 +108,3 @@ if __name__ == '__main__':
 			if newWord not in weights or weights[newWord] >= negativeThreshold:
 				result += word + " "
 		print "Before: %s\n After Detox: %s\n" %(comment, result)
-

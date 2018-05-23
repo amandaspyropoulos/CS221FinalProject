@@ -1,5 +1,29 @@
-import os, random, operator, sys
+import os, random, operator, sys, heapq, collections, re, time
 from collections import Counter
+
+############################################################
+# Abstract interfaces for search problems and search algorithms.
+
+class SearchProblem:
+    # Return the start state.
+    def startState(self): raise NotImplementedError("Override me")
+
+    # Return whether |state| is an end state or not.
+    def isEnd(self, state): raise NotImplementedError("Override me")
+
+    # Return a list of (action, newState, cost) tuples corresponding to edges
+    # coming out of |state|.
+    def succAndCost(self, state): raise NotImplementedError("Override me")
+
+class SearchAlgorithm:
+    # First, call solve on the desired SearchProblem |problem|.
+    # Then it should set two things:
+    # - self.actions: list of actions that takes one from the start state to an end
+    #                 state; if no action sequence exists, set it to None.
+    # - self.totalCost: the sum of the costs along the path or None if no valid
+    #                   action sequence exists.
+    def solve(self, problem): raise NotImplementedError("Override me")
+
 
 def dotProduct(d1, d2):
     """
@@ -31,7 +55,7 @@ def readExamples(path):
     comment = ""
     y = 0
     for line in open(path):
-        
+
         # Format of each comment: <output label (+1 or -1)> <input sentence>
         if line[0:2] != "-1" and line[0:2] != "+1": # continuation of previous comment
             comment += line
@@ -50,7 +74,7 @@ def readExamples(path):
 
             if not comment:
                 y, comment = line.split(' ', 1) #
-        
+
     print 'Read %d examples from %s' % (len(examples), path)
     return examples
 
@@ -96,7 +120,7 @@ def interactivePrompt(featureExtractor, weights):
         print '> ',
         x = sys.stdin.readline()
         if not x: break
-        phi = featureExtractor(x) 
+        phi = featureExtractor(x)
         verbosePredict(phi, None, weights, sys.stdout)
 
 ############################################################
