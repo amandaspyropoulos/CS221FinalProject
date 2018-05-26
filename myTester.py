@@ -11,45 +11,55 @@ import sys
 from util import *
 import pandas as pd
 import numpy as np
+import nltk
+from nltk.corpus import wordnet
 
 class TranslateProblem(SearchProblem):
 	def __init__(self, comment, weights):
 		# Comment is a full comment, turned into a list of words
-		self.comment = comment.split()
+		self.comment = comment
 		# Weights is a dictionary where keys are words and vals are their weight, as predicted by our linear classifier
 		self.weights = weights
 
 	def startState(self):
 		# Return information for start state
-		return ([], 0)
+		return 0
 
 	def isEnd(self, state):
-		return (len(self.comment)) == state[1]
+		return (len(self.comment)) == state
 
 	def succAndCost(self, state):
-		currentCom, index = state
+		index = state
 		successors = []
 
 		# Create list of Actions
 		#actions = synonyms
-		actions = []
+		def findSynonyms(word):
+			synonyms = []
+			for syn in wordnet.synsets(word):
+				for l in syn.lemmas():
+					synonyms.append(l.name())
+			return synonyms
+		actions = findSynonyms(self.comment[index])
 		actions.append("ACTION_KEEP")
 		actions.append("ACTION_DELETE")
 
+		print(self.comment[index], actions)
+
 		# For each action, find successor state and cost
 		for a in actions:
-			newCom = currentCom[:]
+			newState = index + 1
+			cost = 0
 			if a == "ACTION_KEEP":
-				newCom.append(self.comment[index])
-				newState = (newCom, index + 1)
-				successors.append((a, newState, self.weights[self.comment[index]]))
-			#elif a == "ACTION_DELETE":
-				#newState = (newCom, index + 1)
-				#successors.append((a, newState, 0)
-			else:
-				newCom.append(a)
-				newState = (newCom, index + 1)
-				successors.append((a, newState, self.weights[a]))
+				if self.comment[index] in self.weights:
+					cost = self.weights[self.comment[index]]
+			elif a != "ACTION_DELETE":
+				#print(a)
+				if a in self.weights:
+					cost = self.weights[a]
+				else:
+					continue
+			successors.append((a, newState, cost))
 		return successors
 
 
@@ -97,14 +107,22 @@ if __name__ == '__main__':
 	print "Official: train error = %s, dev error = %s" % (trainError, devError)
 
 	toxicExamples = readExamples('toxic.dev')
+	print("About to initialize UCS")
+	ucs = UniformCostSearch(verbose=0)
+	print("Successfully initialized UCS.")
 	for example in toxicExamples:
 		comment, rating = example
+		#comment = example
+		comment = re.sub("[^a-zA-Z ]","", comment)
+		comment = comment.lower()
 		words = comment.split(' ')
-		result = ""
-		for word in words:
+		#for word in words:
 			# remove any non-alphabetic characters
-			newWord = re.sub("[^a-zA-Z]","", word)
-			newWord = newWord.lower()
-			if newWord not in weights or weights[newWord] >= negativeThreshold:
-				result += word + " "
-		print "Before: %s\n After Detox: %s\n" %(comment, result)
+			#word = re.sub("[^a-zA-Z]","", word)
+			#word = word.lower()
+		print("About to solve Translate Problem.")
+		ucs.solve(TranslateProblem(words, weights))
+		print("Successfully solved Translate Problem.\n\n")
+
+		print "Before:\n %s\n After Detox: " % comment
+		print(ucs.actions)
