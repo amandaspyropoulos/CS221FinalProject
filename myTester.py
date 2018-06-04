@@ -1,5 +1,5 @@
 # Amanda Spyropoulos
-# v1, 5/4/18
+# v3, 6/3/18
 import re
 import time
 from util import *
@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 import nltk
 from nltk.corpus import wordnet
+from nltk.translate.bleu_score import sentence_bleu
 
 class TranslateProblem(SearchProblem):
 	def __init__(self, comment, weights):
@@ -44,7 +45,7 @@ class TranslateProblem(SearchProblem):
 		actions.append("ACTION_KEEP")
 		actions.append("ACTION_DELETE")
 
-		print(self.comment[index], actions)
+		#print(self.comment[index], actions)
 
 		# For each action, find successor state and cost
 		for a in actions:
@@ -62,8 +63,22 @@ class TranslateProblem(SearchProblem):
 			successors.append((a, newState, cost))
 		return successors
 
+def convertUCSActionsToString(words, actions):
+	newActions = []
+
+	for index, word in enumerate(actions):
+		if word ==  "ACTION_KEEP":
+			newActions.append(words[index])
+		elif word == "ACTION_DELETE":
+			pass
+		else:
+			newActions.append(str(word))
+
+	return ' '.join(newActions)
+
 
 if __name__ == '__main__':
+	testing = True
 	#### UNCOMMENT THIS SECTION after you run this for the first time
 
 	#Create the test and train .dev files
@@ -71,14 +86,20 @@ if __name__ == '__main__':
 	totalRows = 159572
 	testingRatio = .1
 
-	fTrain = open("CommentTrain.dev","a+")
-	fTest = open("CommentTest.dev","a+")
+	if testing:
+		totalRows = 5000
+		print "TESTING"
+
+	fTrain = open("CommentTrain.dev","wa+")
+	fTest = open("CommentTest.dev","wa+")
 
 	# let's read the csv file
 
 	data = pd.read_csv("train.csv")
 
 	for index, row in data.iterrows():
+		if index > totalRows:
+			break
 		if index > totalRows*(1 - testingRatio): # set aside some of the data for testing
 			f = fTest
 		else:
@@ -92,6 +113,7 @@ if __name__ == '__main__':
 			f.write("-1 %s\r\n" % comment)
 	f.close()
 
+	print "done with creating CommentTrain and CommentDev files"
 	#####
 
 	negativeThreshold = -.5
@@ -99,7 +121,11 @@ if __name__ == '__main__':
 	trainExamples = readExamples('CommentTrain.dev')
 	devExamples = readExamples('CommentTest.dev')
 	featureExtractor = submission.extractWordFeatures
-	weights = submission.learnPredictor(trainExamples, devExamples, featureExtractor, numIters=20, eta=0.01)
+	if testing:
+		numIters = 4
+	else:
+		numIters = 20
+	weights = submission.learnPredictor(trainExamples, devExamples, featureExtractor, numIters, eta=0.01)
 	outputWeights(weights, 'weights')
 	outputErrorAnalysis(devExamples, featureExtractor, weights, 'error-analysis')  # Use this to debug
 	trainError = evaluatePredictor(trainExamples, lambda(x) : (1 if dotProduct(featureExtractor(x), weights) >= 0 else -1))
@@ -107,11 +133,16 @@ if __name__ == '__main__':
 	print "Official: train error = %s, dev error = %s" % (trainError, devError)
 
 	toxicExamples = readExamples('toxic.dev')
+	translatedToxicExamples = readExamples('toxicTranslated.dev')
+
 	print("About to initialize UCS")
 	ucs = UniformCostSearch(verbose=0)
 	print("Successfully initialized UCS.")
-	for example in toxicExamples:
+	for index, example in enumerate(toxicExamples):
 		comment, rating = example
+		
+		translatedComment, TranslatedRating = translatedToxicExamples[index]
+		
 		#comment = example
 		comment = re.sub("[^a-zA-Z ]","", comment)
 		comment = comment.lower()
@@ -125,4 +156,13 @@ if __name__ == '__main__':
 		print("Successfully solved Translate Problem.\n\n")
 
 		print "Before:\n %s\n After Detox: " % comment
-		print(ucs.actions)
+
+		machineTranslatedComment = convertUCSActionsToString(words, ucs.actions)
+		print(machineTranslatedComment)
+		score = sentence_bleu(machineTranslatedComment.split(), translatedComment.split())
+		print "Human - translated comment: "
+		print translatedComment
+		print "Score: "
+		print (score)
+
+
